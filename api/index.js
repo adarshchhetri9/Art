@@ -1,11 +1,14 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const UserModel = require("./models/User.js");
+const User = require("./models/User.js");
 require("dotenv").config();
 
 const bcryptSalt = bcrypt.genSaltSync(10);
+const jwtSecret = "dsfjsdf1312dfsdfjsfdhk";
+
 const app = express();
 app.use(express.json());
 app.use(
@@ -26,12 +29,12 @@ app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    const User = await UserModel.create({
+    const userDoc = await User.create({
       name,
       email,
       password: bcrypt.hashSync(password, bcryptSalt),
     });
-    res.json(User);
+    res.json(userDoc);
   } catch (error) {
     res.status(422).json(error);
   }
@@ -39,9 +42,22 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const User = UserModel.findOne({ email, password });
-  if (User) {
-    res.json("found");
+  const userDoc = await User.findOne({ email });
+  if (userDoc) {
+    const passOk = bcrypt.compareSync(password, userDoc.password);
+    if (passOk) {
+      jwt.sign(
+        { email: userDoc.email, id: userDoc._id },
+        jwtSecret,
+        {},
+        (err, token) => {
+          if (err) throw err;
+          res.cookie("token", token).json(userDoc);
+        }
+      );
+    } else {
+      res.json("pass not ok");
+    }
   } else {
     res.json("not found");
   }
